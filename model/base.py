@@ -1,4 +1,6 @@
 from model.db import client
+from model.exceptions import ObjectDoesNotExist
+
 
 def with_metaclass(meta, *bases):
     """Create a base class with a metaclass."""
@@ -17,6 +19,9 @@ class EmptyResult(object):
 
 class Query(object):
     def __init__(self, query={}):
+        if 'pk' in query:
+            query['_id'] = query['pk']
+            del query['pk']
         self.query = query
 
     def update(self, query):
@@ -63,7 +68,7 @@ class _meta(object):
 
 
 class Base(type):
-    fields = []
+    # fields = []
     mongo = client
 
     def __new__(cls, name, bases, attrs):
@@ -77,12 +82,21 @@ class Base(type):
 
         if 'Meta' not in attrs:
             return new_class
+
         Meta = attrs['Meta']
         db = Meta.db
         collection = Meta.collection
         meta = _meta()
         meta.collection = cls.mongo[db][collection]
         new_class._meta = meta
+
+
+        class DoesNotExist(ObjectDoesNotExist):
+            __module__ = '.'.join(
+                [new_class.__module__, new_class.__name__]
+            )
+
+        new_class.DoesNotExist = DoesNotExist
         return new_class
 
     def add_to_class(cls, attr, val):
@@ -92,13 +106,24 @@ class Model(with_metaclass(Base)):
     def __init__(self, data):
         self._objectid = None
         self._dict = data
-        for attr in self.fields + ['_id', ]:
+        for attr in self.fields:
             setattr(self, attr, data.get(attr, None))
+        self.pk = data.get('_id', None)
+
+    @property
+    def fullfields(self):
+        return self.fields + ['_id', ]
 
     @property
     def dictdata(self):
+        result = self._dictdata
+        result['pk'] = self._dict.get('_id')
+        return result
+
+    @property
+    def _dictdata(self):
         result = {}
-        for field in self.fields + ['_id', ]:
+        for field in self.fields:
             result[field] = getattr(self, field, None)
         return result
 
@@ -117,4 +142,12 @@ class Model(with_metaclass(Base)):
         return query.filter(**kwargs)
 
     def save(self):
-        self._meta.collection.insert_one(self.dictdata)
+        if self.pk:
+            self._meta.collection.update(
+                {"_id": self.pk},
+                {"$set": self._dictdata},
+            )
+        else:
+            # self._meta.collection.insert_one(self.dictdata)
+            print "haha"
+

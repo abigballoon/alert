@@ -18,11 +18,14 @@ def pre_request():
 def SessionBaseAuthenication():
     session = request.cookies.get('session', '')
     if session:
-        session_info = Session.get(session_token=session)
-        logging.info(session_info.toDict())
+        try:
+            session_info = Session.get(session_token=session)
+        except Session.DoesNotExist:
+            return
+
         userid = session_info.user_id
         if userid:
-            user = User.get(id=userid)
+            user = User.get(pk=userid)
             request.user = user
 
 def UnAuthorized():

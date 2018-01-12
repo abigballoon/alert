@@ -4,4 +4,11 @@ app = Flask(__name__) # create the application instance :)
 
 @app.route('/')
 def hello():
-    return "hello"
+    # return "name"
+    return ','.join(
+        [
+            request.user.username,
+            request.user.email,
+            request.user.name,
+        ]
+    )

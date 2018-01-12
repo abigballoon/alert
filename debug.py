@@ -2,6 +2,12 @@ import sys
 from etc.conf import BASE_DIR
 sys.path.insert(0, BASE_DIR)
 
-from common.models import Session
+from common.models import User, Session
 
-s = Session.get(session_token="haha")
+u = User.get()
+
+sessions = Session.filter()
+
+for session in sessions.result:
+    session.user_id = u.pk
+    session.save()
